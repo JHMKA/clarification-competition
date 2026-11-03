@@ -731,12 +731,14 @@ def main(
     task_id: str | None = None,
     model_name: str = "openai/gpt-4.1-mini",
     temperature: float = 0.7,
+    decision_model: str | None = None,
     **kwargs: Any,
 ) -> None:
 
     config = ClarificationConfiguration(
         language_model=model_name,
         temperature=temperature,
+        decision_model=decision_model,
         max_clarification_turns=1000,
         max_clarification_budget=2.0,
         max_prompt_budget=2.0,

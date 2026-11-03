@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from functools import wraps
 from typing import Any
 
-from clarify.llm import LanguageModel
+from clarify.llm import DecisionModel, LanguageModel
 from clarify.runtime import EvalPlusDockerInstanceEvaluator
 
 _in_test_context: ContextVar[bool] = ContextVar("_in_test_context", default=False)
@@ -18,6 +18,7 @@ class ClarificationConfiguration:
     language_model: str = "openai/gpt-4.1-mini"
     temperature: float = 0.7
     clarification_model: str | None = None
+    decision_model: str | None = None
 
     # Budget constraints
     max_clarification_turns: int = 1
@@ -120,6 +121,7 @@ class _ClarificationEnvironment:
         self._clarify_llm = LanguageModel(
             config.clarification_model or config.language_model, temperature=0.0
         )
+        self._decision_llm = DecisionModel(config.decision_model) if config.decision_model else None
         self._num_clarification_turns = 0
         self._clarification_history = []
         self._clarification_chat_history = None
@@ -134,7 +136,7 @@ class _ClarificationEnvironment:
 
     @property
     def prompt_cost(self):
-        return self._llm.total_cost
+        return self._llm.total_cost + (self._decision_llm.total_cost if self._decision_llm else 0.0)
 
     @property
     def prompt_budget(self):
@@ -187,6 +189,19 @@ class _ClarificationEnvironment:
             self._llm_hook(message)
 
     # Main API -----------------------------------------------------------------
+
+    def decide(
+        self,
+        questions: dict[str, Any],
+        context: str | dict[str, Any] | list[dict[str, Any]] = "",
+    ) -> dict[str, Any]:
+        if self._decision_llm is None:
+            raise RuntimeError("No decision model is configured.")
+
+        if self.prompt_cost >= self.prompt_budget:
+            raise LimitsExceededException("You exceeded the prompt budget.")
+
+        return self._decision_llm(questions, context)
 
     def llm(self, messages: list[dict[str, str]] | str) -> str:
         if self.prompt_cost >= self.prompt_budget:

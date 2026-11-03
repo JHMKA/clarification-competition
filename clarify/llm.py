@@ -184,3 +184,39 @@ class LanguageModel:
         for k, v in self.completion_kwargs.items():
             params.append(f"{k}={v!r}")
         return f"LM({', '.join(params)})"
+
+
+class DecisionModel(LanguageModel):
+    def __init__(self, model: str, num_retries: int = 3, **kwargs: Any):
+        super().__init__(model, num_retries=num_retries, **kwargs)
+
+    def __call__(
+        self,
+        questions: dict[str, Any],
+        context: str | dict[str, Any] | list[dict[str, Any]] = "",
+    ) -> dict[str, Any]:
+        import litellm
+
+        response = litellm.decisions(
+            model=self.model,
+            state=context,
+            questions=questions,
+            num_retries=self.num_retries,
+            **self.completion_kwargs,
+        )
+
+        try:
+            cost = litellm.completion_cost(completion_response=response, model=self.model) or 0.0
+        except Exception:
+            cost = 0.0
+
+        usage = getattr(response, "usage", None)
+        tokens_in = (getattr(usage, "input_tokens", 0) or 0) if usage is not None else 0
+        tokens_out = (getattr(usage, "output_tokens", 0) or 0) if usage is not None else 0
+
+        with self._cost_lock:
+            self._total_cost += cost
+            self._total_tokens_in += tokens_in
+            self._total_tokens_out += tokens_out
+
+        return response.model_dump()["answers"]

@@ -239,6 +239,7 @@ def main(
     max_clarification_budget: float = 1.0,
     num_samples: int = 1,
     split: str | None = None,
+    decision_model: str | None = None,
     **kwargs,
 ):
     batch_size = max(batch_size, max_workers)
@@ -248,6 +249,7 @@ def main(
         language_model=language_model,
         temperature=temperature,
         clarification_model=clarification_model,
+        decision_model=decision_model,
         max_clarification_budget=max_clarification_budget,
         max_prompt_budget=max_prompt_budget,
     )

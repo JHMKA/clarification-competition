@@ -188,6 +188,18 @@ class ClarificationEnvironment:
                    Message history: [{'role': 'system', 'content': ...}, {'role': 'user', 'content': ...}, ...]
         """
 
+    def decide(self, questions: dict[str, Any], context="") -> dict[str, Any]:
+        """
+        Simple API to query decision models.
+
+        Inputs:
+        questions - Named questions requesting probabilities, choices, or scores.
+        context - Optional context to judge (text, a dict, or a list).
+
+        Returns:
+        A dictionary of answers keyed by question name.
+        """
+
     def exec_code(self, complete_code: str) -> str:
         """
         Executes the given `complete_code` in a Docker environment.
@@ -196,6 +208,26 @@ class ClarificationEnvironment:
         Returns:
         A string representing std out of the Docker environment.
         """
+```
+
+#### Support for Decision Models (JEV etc.)
+
+⚠️ **Participants must request a decision model in their submission to use `env.decide`.**
+
+Use `env.decide` to ask a decision model for probabilities, choices, or scores instead of a text response:
+
+```python
+answers = env.decide(
+    questions={
+        "language": {
+            "type": "choice",
+            "instructions": "Identify the language of the text.",
+            "criteria": {"english": "English", "german": "German", "french": "French"},
+        }
+    },
+    context="Bonjour tout le monde !",
+)
+language = answers["language"]["choice"]
 ```
 
 ## Submission
