@@ -83,7 +83,7 @@ def _print_test_overview(results):
         output = result["test_result"]
 
         clarification = "❌"
-        if result["clarification_history"]:
+        if result.get("clarification_history", []):
             clarification = max(e[2] for e in result["clarification_history"])
             clarification = clarify_map.get(clarification, clarification)
 
@@ -100,7 +100,7 @@ def _print_test_overview(results):
 def _turn_discounted_sucess(results, base: int = 10):
     turn_discounted_sucess = 0.0
     for result in results:
-        clarification_length = len(result["clarification_history"])
+        clarification_length = len(result.get("clarification_history", []))
         if result["success"]:
             turn_discounted_sucess += math.log(base) / math.log(base + clarification_length)
 
@@ -110,7 +110,7 @@ def _turn_discounted_sucess(results, base: int = 10):
 def _normalized_discounted_cumulative_gain(results, base: int = 2):
     nDCG = 0.0
     for result in results:
-        indicator = [e[2] == "3" for e in result["clarification_history"]]
+        indicator = [e[2] == "3" for e in result.get("clarification_history", [])]
 
         discounted_cumulative_gain = 0.0
         idealized_cumulative_gain = 0.0
@@ -145,23 +145,23 @@ def print_statistics(output_path):
     pass_at_1 = sum(r["success"] for r in results)
     table.add_row("Pass@1", f"{100 * pass_at_1 / total:.2f}")
 
-    clarification_rate = sum(len(r["clarification_history"]) > 0 for r in results)
+    clarification_rate = sum(len(r.get("clarification_history", [])) > 0 for r in results)
     table.add_row("Clarification rate", f"{100 * clarification_rate / total:.2f}%")
 
     overask_result = [r for r in results if not r.get("need_clarification", True)]
     overasking_rate = 0.0
     if overask_result:
-        overasking_rate = sum(len(r["clarification_history"]) > 0 for r in overask_result) / len(
-            overask_result
-        )
+        overasking_rate = sum(
+            len(r.get("clarification_history", [])) > 0 for r in overask_result
+        ) / len(overask_result)
 
     table.add_row("Overasking rate", f"{100 * overasking_rate:.2f}%")
 
     if clarification_rate > 0:
         high_quality_clarification = sum(
-            all(e[2] == "3" for e in r["clarification_history"])
+            all(e[2] == "3" for e in r.get("clarification_history", []))
             for r in results
-            if len(r["clarification_history"]) > 0
+            if len(r.get("clarification_history", [])) > 0
         )
         table.add_row(
             "High quality clarification",
@@ -169,7 +169,7 @@ def print_statistics(output_path):
         )
 
         clarification_length = sum(
-            sum(len(e[3]) for e in r["clarification_history"]) for r in results
+            sum(len(e[3]) for e in r.get("clarification_history", [])) for r in results
         )
         table.add_row(
             "Average clarification length", f"{clarification_length / clarification_rate:.2f}"
@@ -220,14 +220,14 @@ def _compute_output_row(results):
     ndcg = _normalized_discounted_cumulative_gain(results)
 
     pass_at_1 = sum(r["success"] for r in results) / total
-    clarification_rate = sum(len(r["clarification_history"]) > 0 for r in results) / total
+    clarification_rate = sum(len(r.get("clarification_history", [])) > 0 for r in results) / total
 
     overask_result = [r for r in results if not r.get("need_clarification", False)]
     overasking_rate = 0.0
     if overask_result:
-        overasking_rate = sum(len(r["clarification_history"]) > 0 for r in overask_result) / len(
-            overask_result
-        )
+        overasking_rate = sum(
+            len(r.get("clarification_history", [])) > 0 for r in overask_result
+        ) / len(overask_result)
 
     prompt_cost = sum(r.get("prompt_cost", 0.0) for r in results) / total
 
