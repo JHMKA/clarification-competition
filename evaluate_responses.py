@@ -151,9 +151,9 @@ def print_statistics(output_path):
     overask_result = [r for r in results if not r.get("need_clarification", True)]
     overasking_rate = 0.0
     if overask_result:
-        overasking_rate = sum(len(r.get("clarification_history", [])) > 0 for r in overask_result) / len(
-            overask_result
-        )
+        overasking_rate = sum(
+            len(r.get("clarification_history", [])) > 0 for r in overask_result
+        ) / len(overask_result)
 
     table.add_row("Overasking rate", f"{100 * overasking_rate:.2f}%")
 
@@ -225,9 +225,9 @@ def _compute_output_row(results):
     overask_result = [r for r in results if not r.get("need_clarification", False)]
     overasking_rate = 0.0
     if overask_result:
-        overasking_rate = sum(len(r.get("clarification_history", [])) > 0 for r in overask_result) / len(
-            overask_result
-        )
+        overasking_rate = sum(
+            len(r.get("clarification_history", [])) > 0 for r in overask_result
+        ) / len(overask_result)
 
     prompt_cost = sum(r.get("prompt_cost", 0.0) for r in results) / total
 
