@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: MIT
 
-"""ClariBridge.
+"""ClariBridge V150.10: bind finite property proposals to exact answer clauses.
 
 Generate candidate implementations and use SDK execution feedback to select a
 clarification question. After a reply, compare candidates against grounded
@@ -12,13 +12,20 @@ Team: KeepGoing-Z
 Team Members: Pengchao Zheng, Mengyi Hu
 Main Contact: pczheng@mail.ustc.edu.cn
 
-Direct parent: project-authored fixed V150, SHA256
+Algorithm ancestry: project-authored fixed V150, SHA256
 2d541adaf9bab7b224c405d7dd3146fecf706b1a203f66cf38b8007a50ce8339.
-This compatibility revision renames only owned helper members and receipt
-metadata, preserves original model-visible receipt names at serialization,
-and uses the public standard-library type-description API for type labels.
-All prompts, candidate paths, ranking, repair, cache truth/coverage semantics,
-execution program, defaults and budgets are inherited without strategy changes.
+V150.2 submission parent SHA256:
+ebda2c35f5a2c61654eb62800f8facb986b5e91f3c5ba171b58d933a124030f4.
+Preserve valid question summaries independently of optional metadata, preserve
+target schemas during recovery, and request up to two source-backed semantic
+decisions in the existing question call. Choices remain fallible questions;
+they never supply executable expected values. Initial construction prompts,
+candidate generation, execution, ranking and repair follow the parent.
+
+Direct implementation parent: V150.8, SHA256
+500662f5fbc7827dd5206a4c2421ed0439144173c87125a97921e8e24951290f.
+Finite property proposals reference controller-owned answer-clause indices;
+an exact, unconditional positive return-type contrast is checked locally.
 """
 
 import ast
@@ -45,8 +52,8 @@ V129_PROMPTS = {
         "reconstruction_builder": "Solve the clarified operation anew. Your specification is the unedited original_prompt together with the exact question and actual_answer; do not infer intent from another generated program. Use the reply's explicit scope and preserve remaining requirements. A routing summary or evidence ledger can help organize work, but neither replaces the conversation. Design a coherent algorithm and handle the documented domain rather than patching imaginary tests. Produce a complete implementation as one Python fence and include its public callable. Consult reply_coverage alongside the full actual_answer. Its retained_reply_clauses and semantic_notes may contain obligations that are not represented by any executable check. Missing checks do not authorize ignoring those obligations. Clause confirmations concern only their identified scope; execution agreement does not confirm the remaining contract.",
         "boundary_builder": "Develop an implementation of the same clarified task with particular attention to its documented boundaries, argument roles and result representation. Use the original task and complete real exchange. Different candidate responsibilities are not permission to implement different user requirements. Inspect the supplied scoped obligations for missing boundary cases, while treating speculative or unresolved checks as suggestions. Support the ordinary central behavior as well as the boundaries. Output a single Python-fenced module, including the exact public callable and needed helpers. Consult reply_coverage alongside the full actual_answer. Its retained_reply_clauses and semantic_notes may contain obligations that are not represented by any executable check. Missing checks do not authorize ignoring those obligations. Clause confirmations concern only their identified scope; execution agreement does not confirm the remaining contract.",
         "observation_inputs": "Suggest a compact set of small positional-argument tuples for observing implementations. Supply inputs only; do not guess their outputs. Each observation records argument_literals, domain_evidence, source (prompt or answer) and domain_status (explicit or uncertain). Copy domain evidence from that source when it exists. A vague domain should be marked uncertain rather than manufactured as explicit. After clarification, inspect previous_inputs and the reply before refreshing observations: a usable old input need not be discarded just because you propose new ones. Focus on central behavioral distinctions and permitted boundary cases. Use the observations JSON layout provided in expected_schema.",
-        "behavior_question": "Describe the selected implementation as a fallible behavior contract for its requester to correct. Supply input_summary (argument roles and shapes), result_summary (return representation), and operation_summary (the central mapping, including ordinary cases). These describe anchor_source, not established requirements. Do not write a question, invent example outputs, or quote implementation text. Select witness_id from anchor_observations, preferring a normal valid input that separates candidates; the controller will print its recorded values. Set conflict_spans to two short exact original passages only when their core requirements cannot both hold, otherwise []. Keep each summary concise and declarative. A local ambiguity must not displace coverage of the complete central operation. Use the supplied JSON schema.",
-        "question_revision": "Complete the missing or malformed parts of the behavior contract record using anchor_source and the public description. Preserve uncertainty instead of supplying an imagined requirement. Include input_summary, result_summary, operation_summary and a supplied witness_id when one exists. The controller owns the final request and the execution example; do not compose either. conflict_spans must be empty or a supported pair of original passages. Return the requested JSON record.",
+        "behavior_question": "Describe the selected implementation as a fallible behavior contract for its requester to correct. Supply input_summary (argument roles and shapes), result_summary (return representation), and operation_summary (the central mapping, including ordinary cases). These describe anchor_source, not established requirements. Do not write a question, invent example outputs, or quote implementation text. Select witness_id from anchor_observations, preferring a normal valid input that separates candidates; the controller will print its recorded values. Set conflict_spans to two short exact original passages only when their core requirements cannot both hold, otherwise []. Keep each summary concise and declarative. A local ambiguity must not displace coverage of the complete central operation. Use the supplied JSON schema. Also identify up to two unresolved behavior decisions from original_prompt, even when all drafts agree. Prefer the central mapping or a contradictory requirement before incidental boundaries. For each decision copy source_span exactly from original_prompt; name dimension and status; give a concrete missing detail, two plausible alternative rules and how the rules change behavior. Do not invent an ambiguity already settled by the prompt. Both alternatives are hypotheses, not requirements or an exhaustive list. Do not invent input/output values or use task familiarity as a specification. Use decisions=[] when there is no defensible unresolved decision. Keep all three contract summaries useful even if witness_id is empty or conflict_spans is []. Choose witness_id only from allowed_witness_ids, never from other measurement IDs.",
+        "question_revision": "Complete the missing or malformed parts of the behavior contract record using anchor_source and the public description. Preserve uncertainty instead of supplying an imagined requirement. Include input_summary, result_summary, operation_summary and a supplied witness_id when one exists. The controller owns the final request and the execution example; do not compose either. conflict_spans must be empty or a supported pair of original passages. Return the requested JSON record. Also identify up to two unresolved behavior decisions from original_prompt, even when all drafts agree. Prefer the central mapping or a contradictory requirement before incidental boundaries. For each decision copy source_span exactly from original_prompt; name dimension and status; give a concrete missing detail, two plausible alternative rules and how the rules change behavior. Do not invent an ambiguity already settled by the prompt. Both alternatives are hypotheses, not requirements or an exhaustive list. Do not invent input/output values or use task familiarity as a specification. Use decisions=[] when there is no defensible unresolved decision. Keep all three contract summaries useful even if witness_id is empty or conflict_spans is []. Choose witness_id only from allowed_witness_ids, never from other measurement IDs.",
         "reply_map": "Organize the exact actual_answer for the controller while keeping the entire conversation authoritative. Set effect to confirm, local_change, redefine or unclear, and quote the reply passage behind effect_span; this label only routes construction. Record a short core_intent summary without adding new requirements. call_results contains only input/output values directly written in the reply: argument_literals is a positional tuple, expected_literal is the stated value, and source_span is its full supporting passage. Do not turn a model-derived answer into a literal fact. A plain yes cannot resolve an either/or question. For properties use only the declared finite node kinds with their actual subject, scope and conditions. An input described as a string does not make the return value a string. Preserve negation and the condition that governs a claim. Suggest example_dispositions only where the real reply covers the old example; suggest input_updates only where the reply establishes that input's validity or exclusion. Do not remove an example because generated programs fail it. Return the declared JSON object, using empty lists for unavailable evidence. Conditional properties use arg_compare {kind,index,op,value}, arg_empty {kind,index,empty}, or arg_type {kind,index,value}. Indices are zero-based. Comparison op is eq, ne, lt, le, gt or ge; comparison value is a literal string. Omit condition for unconditional claims. Use bool, int, float, str, list, tuple, dict or set for return_type, and ascending or descending for sorted_order. The question_binding carries separately identified input, result, operation and measured-example clauses. Populate clause_responses with clause_id, verdict (confirmed, corrected, unresolved), and the FULL governing answer sentence as source_span. A general yes to the compound contract does not confirm every clause or the example; leave those unresolved unless the reply identifies their scope. Example confirmation must actually refer to the shown example or its clause ID, with no negation or qualification. Never turn confirmation of representation into confirmation of a numeric result. An explicit corrected input/output pair has precedence over a confirmation. Unexpressed details remain unknown. You may list semantic_notes with a verbatim source_span and a fallible interpretation for requirements that the finite checker cannot express; those notes are for builders and review, not executable oracles.",
         "evidence_arbitration": "Inspect the listed evidence conflict using source text and the real clarification, not popularity among programs. This is a single local review, not a rewrite of the requirement. For each supplied id choose retain, supersede or uncertain, and provide source_span from the actual reply, original_span when relevant, scope and reason. A superseding decision needs a reply statement that applies to the same case or requirement. Repeated execution failure is a reason to investigate; it is not proof that a check is wrong. Distinguish a faulty expected value, an inapplicable input, a program defect and unavailable measurements. If the source does not settle the conflict, keep that uncertainty explicit. Emit only the decisions JSON object.",
         "obligation_rescue": "Build one additional answer-conditioned candidate because the current set has a grounded deficit. Read the original task, exact exchange, active obligations and measured artifacts. Resolve failures supported by those sources without altering the checks to fit your code. Missing observations are not evidence of a wrong program. A suggested route or inferred rule remains fallible. You may choose a new algorithm when the clarified behavior requires it. Supply the entire Python implementation in one code fence with the required public callable. Consult reply_coverage alongside the full actual_answer. Its retained_reply_clauses and semantic_notes may contain obligations that are not represented by any executable check. Missing checks do not authorize ignoring those obligations. Clause confirmations concern only their identified scope; execution agreement does not confirm the remaining contract.",
@@ -80,6 +87,16 @@ V129_PROMPTS = {
             "operation_summary": "draft central input-to-output operation",
             "witness_id": "existing anchor observation ID, or empty",
             "conflict_spans": ["two literal core-conflict passages, or empty list"],
+            "decisions": [
+                {
+                    "dimension": "operation|result|input|boundary|conflict",
+                    "status": "unresolved|contradictory",
+                    "source_span": "short exact original_prompt excerpt",
+                    "detail": "specific semantic decision, not a general request for clarification",
+                    "alternatives": ["possible rule A", "possible rule B"],
+                    "behavior_effect": "concrete behavioral consequence of this decision",
+                }
+            ],
         },
         "question_revision": {
             "input_summary": "short description of draft arguments, not a requirement",
@@ -87,6 +104,16 @@ V129_PROMPTS = {
             "operation_summary": "draft central input-to-output operation",
             "witness_id": "existing anchor observation ID, or empty",
             "conflict_spans": ["two literal core-conflict passages, or empty list"],
+            "decisions": [
+                {
+                    "dimension": "operation|result|input|boundary|conflict",
+                    "status": "unresolved|contradictory",
+                    "source_span": "short exact original_prompt excerpt",
+                    "detail": "specific semantic decision, not a general request for clarification",
+                    "alternatives": ["possible rule A", "possible rule B"],
+                    "behavior_effect": "concrete behavioral consequence of this decision",
+                }
+            ],
         },
         "reply_map": {
             "effect": "confirm|local_change|redefine|unclear",
@@ -99,17 +126,7 @@ V129_PROMPTS = {
                     "source_span": "reply passage",
                 }
             ],
-            "properties": [
-                {
-                    "kind": "return_type|length_equals_input|members_from_input|sorted_order|unique_elements",
-                    "value": "bool|int|float|str|list|tuple|dict|set or ascending|descending, when required",
-                    "arg_index": 0,
-                    "source_span": "verbatim governing source passage",
-                    "scope_clause": "complete governing clause",
-                    "condition": "optional finite condition node",
-                    "condition_span": "governing condition passage when present",
-                }
-            ],
+            "properties": [],
             "example_dispositions": [
                 {
                     "id": "existing example ID",
@@ -129,7 +146,7 @@ V129_PROMPTS = {
             ],
             "clause_responses": [
                 {
-                    "clause_id": "I0|O0|R0|E0",
+                    "clause_id": "I0|O0|R0|E0|D0|D1",
                     "verdict": "confirmed|corrected|unresolved",
                     "source_span": "whole governing answer sentence",
                 }
@@ -160,8 +177,29 @@ V129_PROMPTS = {
             "reason": "specific conflict or uncertainty",
         },
     },
-    "provenance": "V129 is an independently implemented extension of project V128. Dinh PR9 informs the high-level contract-confirmation and execution loop; no Dinh code or prompt is a build input.",
+    "provenance": "V129 is an independently implemented extension of project V128.",
 }
+
+V129_PROMPTS["roles"]["reply_map"] = (
+    V129_PROMPTS["roles"]["reply_map"]
+    .replace(
+        "For properties use only the declared finite node kinds with their actual subject, scope and conditions. "
+        "An input described as a string does not make the return value a string. "
+        "Preserve negation and the condition that governs a claim. ",
+        "For properties, follow property_node_contract and cite only an allowed "
+        "answer_property_sources index. Retain scope and conditions; an input, draft "
+        "or excluded type is not the returned type. The controller supplies source "
+        "text; emit no source_span/scope_clause. Use [] for unsupported or unproved nodes. ",
+    )
+    .replace(
+        "Conditional properties use arg_compare {kind,index,op,value}, arg_empty {kind,index,empty}, "
+        "or arg_type {kind,index,value}. Indices are zero-based. Comparison op is eq, ne, lt, le, gt or ge; "
+        "comparison value is a literal string. Omit condition for unconditional claims. "
+        "Use bool, int, float, str, list, tuple, dict or set for return_type, and ascending or descending "
+        "for sorted_order. ",
+        "",
+    )
+)
 
 
 V129_PROMPTS["roles"].update(
@@ -1304,6 +1342,175 @@ def public_records(prompt, entry):
     return records
 
 
+def _v15010_property_sources(answer):
+    """Bound a verbatim answer-clause prefix without cutting any clause."""
+    clauses = _v129_clauses(answer)
+    sources = []
+    characters = 0
+    for index, clause in enumerate(clauses):
+        if len(sources) >= 32 or characters + len(clause) > 12000:
+            break
+        sources.append(dict(source_clause_index=index, source_span=clause))
+        characters += len(clause)
+    return dict(
+        protocol="answer-property-clauses-v1",
+        clauses=sources,
+        total_clause_count=len(clauses),
+        emitted_clause_count=len(sources),
+        emitted_character_count=characters,
+        omitted_clause_count=len(clauses) - len(sources),
+        overflow=len(sources) < len(clauses),
+        max_clauses=32,
+        max_characters=12000,
+    )
+
+
+def _v15010_property_packet(packet):
+    return dict(
+        packet,
+        answer_property_sources=_v15010_property_sources(packet.get("actual_answer", "")),
+        property_node_contract=dict(
+            required_fields=["kind", "value", "source_clause_index"],
+            source_clause_index_type="integer, not bool; must occur in source table",
+            kinds=["return_type"],
+            return_type_values=["bool", "int", "float", "str", "list", "tuple", "dict", "set"],
+            optional_condition=dict(
+                arg_compare=dict(
+                    fields=["kind", "index", "op", "value"],
+                    op=["eq", "ne", "lt", "le", "gt", "ge"],
+                    value="literal string",
+                ),
+                arg_empty=dict(fields=["kind", "index", "empty"], empty="boolean"),
+                arg_type=dict(fields=["kind", "index", "value"], value_enum="return_type_values"),
+                index="integer 0..7",
+                condition_span="verbatim substring of cited clause",
+                unconditional="omit condition/condition_span",
+            ),
+            forbidden_fields=[
+                "source_span",
+                "scope_clause",
+                "expression",
+                "expr",
+                "code",
+                "predicate",
+            ],
+            context_policy=(
+                "Other clauses: independent input-type declarations or same-type output "
+                "declarations only; otherwise unknown."
+            ),
+        ),
+    )
+
+
+def _v15010_type_contrast(clause, value):
+    """Recognize one complete mandatory output-type assertion and its exclusion."""
+    if not isinstance(value, str) or value not in _V129_TYPES:
+        return False
+    surface = _v129_without_quoted(clause).strip()
+    names = "|".join(re.escape(word) for words in _V129_TYPES.values() for word in words)
+    article = r"(?:(?:a|an|the|one|single|python|built-in|builtin)\s+)*"
+    subject = (
+        r"(?:(?:the\s+)?function\s+(?:must|should)\s+return\s+"
+        r"|(?:the\s+)?(?:return(?:ed)?\s+type|output\s+type|result\s+type)\s+"
+        r"(?:is|must be|should be)\s+)"
+    )
+    introduction = (
+        r"(?:(?:Correction|To clarify)[:,]?\s*"
+        r"|Your interpretation includes (?:some )?inaccuracies:\s*)?"
+    )
+    pattern = (
+        introduction + subject + article + r"(?P<positive>" + names + r")\b"
+        r"(?:\s*,\s*not\s+|\s+rather than\s+)" + article + r"(?P<negative>" + names + r")\b\s*[.;]?"
+    )
+    found = re.fullmatch(pattern, surface, re.I)
+    if not found:
+        return False
+    positive = found["positive"].lower()
+    negative = found["negative"].lower()
+    canonical = {word: kind for kind, words in _V129_TYPES.items() for word in words}
+    return canonical[positive] == value and canonical[positive] != canonical[negative]
+
+
+def _v15010_indexed_type_subject(clause, value, conditional):
+    """Admit a complete plain type declaration, not an embedded assertion."""
+    surface = _v129_without_quoted(clause)
+    if not conditional and re.search(
+        r"\bfor\b[^.;\n]{0,100}\b(?:inputs?|arguments?|strings?|integers?|lists?|tuples?|dictionaries|sets?)\b",
+        surface,
+        re.I,
+    ):
+        return False
+    names = (
+        "|".join(re.escape(word) for word in _V129_TYPES.get(value, ()))
+        if isinstance(value, str)
+        else ""
+    )
+    if not names:
+        return False
+    article = r"(?:(?:a|an|the|one|single|python|built-in|builtin)\s+)*"
+    subject = (
+        r"(?:\b(?:the\s+)?function\s+(?:returns?|(?:must|should)\s+return)\s+"
+        r"|\b(?:the\s+)?(?:output|result|return value|return(?:ed)? type|output type|result type)\s+"
+        r"(?:is|must be|should be)\s+)"
+    )
+    introduction = r"(?:(?:Correction|To clarify)[:,]?\s*)?"
+    # This optional tail only identifies collection members. A behavioral
+    # explanation, reference to an old implementation or domain qualifier is
+    # deliberately outside this small whole-clause grammar.
+    members = (
+        r"(?:\s+of\s+(?:integers?|strings?|floats?|booleans?|tuples?|lists?|dictionaries|sets?))?"
+        if value in {"list", "tuple", "set"}
+        else ""
+    )
+    return bool(
+        re.fullmatch(
+            r"\s*"
+            + introduction
+            + subject
+            + article
+            + r"(?:"
+            + names
+            + r")\b"
+            + members
+            + r"\s*[.;]?\s*",
+            surface,
+            re.I,
+        )
+    )
+
+
+def _v15010_property_context(answer, clause, value):
+    """Conservatively classify the rest of the answer; no new node is emitted."""
+    if not isinstance(value, str) or value not in _V129_TYPES:
+        return "Indexed return type value is outside the source protocol"
+    types = r"(?:bool|boolean|int|integer|float|str|string|list|tuple|dict|dictionary|set)"
+    article = r"(?:(?:a|an|one|single|any|python)\s+)*"
+    members = (
+        r"(?:\s+of\s+(?:integers?|strings?|floats?|booleans?|tuples?|lists?|dictionaries|sets?))?"
+    )
+    input_declaration = (
+        r"\s*(?:(?:the\s+)?(?:input|argument)\s+(?:is|must be|should be)\s+"
+        r"|(?:the\s+)?function\s+accepts\s+)" + article + types + members + r"\s*[.;]?\s*"
+    )
+    for other in _v129_clauses(answer):
+        if other == clause:
+            continue
+        surface = _v129_without_quoted(other)
+        if re.fullmatch(input_declaration, surface, re.I):
+            continue
+        if _v15010_type_contrast(other, value) or _v15010_indexed_type_subject(other, value, False):
+            continue
+        competing = any(
+            _v15010_type_contrast(other, kind) or _v15010_indexed_type_subject(other, kind, False)
+            for kind in _V129_TYPES
+            if kind != value
+        )
+        if competing:
+            return "Indexed property has conflicting_output_context"
+        return "Indexed property has unclassified_context outside its governing clause"
+    return None
+
+
 def _v129_targeted_type(text, value):
     names = "|".join(re.escape(word) for word in _V129_TYPES[value])
     prefix = r"(?:(?:a|an|the|one|single|python|built-in|builtin)\s+)*"
@@ -1339,10 +1546,18 @@ def _v129_property_clause(item, answer, prompt):
     return None
 
 
-def _v129_properties(items, answer, prompt):
+def _v129_properties(items, answer, prompt, audit=None):
     accepted, advisory = [], []
+    counts = dict(proposed=0, considered=0, known_index=0, invalid_index=0, legacy=0)
+    source_table = _v15010_property_sources(answer)
+    by_index = {
+        item["source_clause_index"]: item["source_span"] for item in source_table["clauses"]
+    }
     if not isinstance(items, list):
+        if audit is not None:
+            audit.update(counts, observed_list=False, accepted=0, rejection_counts={})
         return accepted, advisory
+    counts["proposed"] = len(items)
     allowed = {
         "return_type",
         "length_equals_input",
@@ -1353,16 +1568,34 @@ def _v129_properties(items, answer, prompt):
     for index, item in enumerate(items[:12]):
         if not isinstance(item, dict):
             continue
+        counts["considered"] += 1
 
         def uncertain(reason, item=item):
             advisory.append(
                 dict(proposal=copy.deepcopy(item), reason=reason, source="model_interpretation")
             )
 
+        indexed = "source_clause_index" in item
+        if indexed:
+            source_index = item.get("source_clause_index")
+            if type(source_index) is not int or source_index not in by_index:
+                counts["invalid_index"] += 1
+                uncertain("Answer property source index is not an allowed integer index")
+                continue
+            counts["known_index"] += 1
+        else:
+            counts["legacy"] += 1
         if set(item) & {"expression", "expr", "code", "predicate"}:
             uncertain("Arbitrary model predicate is not admitted")
             continue
+        if indexed:
+            item = dict(
+                item, source_span=by_index[source_index], scope_clause=by_index[source_index]
+            )
         kind = item.get("kind")
+        if indexed and kind != "return_type":
+            uncertain("Indexed property kind is not supported by the source protocol")
+            continue
         resolved = _v129_property_clause(item, answer, prompt)
         if not isinstance(kind, str) or kind not in allowed or resolved is None:
             uncertain("Property type or complete quoted scope is unavailable")
@@ -1385,7 +1618,18 @@ def _v129_properties(items, answer, prompt):
             surface = re.sub(
                 r"\b(?:no duplicates?|without duplicates?)\b", "unique", surface, flags=re.I
             )
-        if re.search(
+        contrast = (
+            indexed
+            and kind == "return_type"
+            and condition is None
+            and _v15010_type_contrast(clause, item.get("value"))
+        )
+        if indexed:
+            context_rejection = _v15010_property_context(answer, clause, item.get("value"))
+            if context_rejection:
+                uncertain(context_rejection)
+                continue
+        if not contrast and re.search(
             r"\b(?:if|unless|except|otherwise|when|whenever|not|never|cannot|or|maybe|perhaps|approximately|provided|assuming)\b|n't\b",
             surface,
             re.I,
@@ -1407,10 +1651,19 @@ def _v129_properties(items, answer, prompt):
             authority="direct",
             status="active",
         )
+        if indexed:
+            prop["source_clause_index"] = source_index
         if condition is not None:
             prop.update(condition=condition, condition_span=condition_span)
         if kind == "return_type":
             value = item.get("value")
+            if (
+                indexed
+                and not contrast
+                and not _v15010_indexed_type_subject(surface, value, condition is not None)
+            ):
+                uncertain("Indexed return type lacks one unambiguous actual-output subject")
+                continue
             if (
                 not isinstance(value, str)
                 or value not in _V129_TYPES
@@ -1484,7 +1737,8 @@ def _v129_properties(items, answer, prompt):
         key = {
             k: v
             for k, v in prop.items()
-            if k not in {"id", "source", "source_span", "scope_clause", "tier"}
+            if k
+            not in {"id", "source", "source_span", "scope_clause", "source_clause_index", "tier"}
         }
         existing = next(
             (
@@ -1493,7 +1747,15 @@ def _v129_properties(items, answer, prompt):
                 if {
                     k: v
                     for k, v in p.items()
-                    if k not in {"id", "source", "source_span", "scope_clause", "tier"}
+                    if k
+                    not in {
+                        "id",
+                        "source",
+                        "source_span",
+                        "scope_clause",
+                        "source_clause_index",
+                        "tier",
+                    }
                 }
                 == key
             ),
@@ -1526,6 +1788,24 @@ def _v129_properties(items, answer, prompt):
             continue
         prop["id"] = "R" + str(len(kept))
         kept.append(prop)
+    if audit is not None:
+        rejection_counts = {}
+        for item in advisory:
+            reason = item["reason"]
+            rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+        audit.update(
+            counts,
+            observed_list=True,
+            unconsidered=max(0, len(items) - 12),
+            accepted=len(kept),
+            accepted_answer=sum(item["source"] == "answer" for item in kept),
+            rejection_counts=rejection_counts,
+            source_table=dict(
+                emitted_clause_count=source_table["emitted_clause_count"],
+                omitted_clause_count=source_table["omitted_clause_count"],
+                overflow=source_table["overflow"],
+            ),
+        )
     return kept, advisory
 
 
@@ -1671,7 +1951,10 @@ def _compile_reply_base(payload, answer, prompt, entry, records, binding):
             record.setdefault("history", []).append(
                 {"reason": "Direct actual-answer correction of this exact call"}
             )
-    properties, uncertain = _v129_properties(payload.get("properties", []), answer, prompt)
+    property_protocol = {}
+    properties, uncertain = _v129_properties(
+        payload.get("properties"), answer, prompt, audit=property_protocol
+    )
     advisory.extend(uncertain)
     kept_properties = []
     for property_record in properties:
@@ -1690,6 +1973,10 @@ def _compile_reply_base(payload, answer, prompt, entry, records, binding):
         else:
             kept_properties.append(property_record)
     properties = kept_properties
+    property_protocol["active_after_literal_conflicts"] = len(properties)
+    property_protocol["literal_conflict_rejections"] = property_protocol.get("accepted", 0) - len(
+        properties
+    )
     disputes = []
     for item in (
         payload.get("example_dispositions", [])
@@ -1743,6 +2030,7 @@ def _compile_reply_base(payload, answer, prompt, entry, records, binding):
         advisory=advisory,
         disputes=disputes,
         input_updates=updates,
+        property_protocol=property_protocol,
     )
 
 
@@ -1979,6 +2267,166 @@ def _contract_shape(data, measured, prompt):
     )
 
 
+def _v1508_summary(value):
+    return isinstance(value, str) and 3 <= len(value.strip()) <= 400 and "?" not in value
+
+
+def _v1508_contract_fields(data, eligible, prompt):
+    """Keep independent usable fields; auxiliary metadata cannot erase summaries."""
+    data = data if isinstance(data, dict) else {}
+    fields = {
+        key: data[key]
+        for key in ("input_summary", "result_summary", "operation_summary")
+        if _v1508_summary(data.get(key))
+    }
+    rejected = []
+    witness = data.get("witness_id", "")
+    if not isinstance(witness, str) or witness and witness not in {i["id"] for i in eligible}:
+        rejected.append("witness_id")
+        witness = ""
+    fields["witness_id"] = witness
+    spans = data.get("conflict_spans", [])
+    valid = (
+        isinstance(spans, list)
+        and len(spans) in (0, 2)
+        and all(isinstance(s, str) and 3 <= len(s) <= 180 and quote(prompt, s) for s in spans)
+        and (not spans or spans[0] != spans[1])
+    )
+    fields["conflict_spans"] = spans if valid else []
+    if not valid:
+        rejected.append("conflict_spans")
+    return fields, rejected
+
+
+def _v1508_decisions(data, prompt):
+    """Validate provenance and bounded structure, without claiming semantic entailment."""
+    items = data.get("decisions", []) if isinstance(data, dict) else []
+    accepted, rejected = [], []
+    if not isinstance(items, list):
+        return [], ["not_a_list"]
+    seen = set()
+    for item in items[:8]:
+        if not isinstance(item, dict):
+            rejected.append("not_an_object")
+            continue
+        if item.get("dimension") not in (
+            "operation",
+            "result",
+            "input",
+            "boundary",
+            "conflict",
+        ) or item.get("status") not in ("unresolved", "contradictory"):
+            rejected.append("status_or_dimension")
+            continue
+        span = item.get("source_span")
+        if not isinstance(span, str) or not 3 <= len(span) <= 240 or not quote(prompt, span):
+            rejected.append("source_span")
+            continue
+        options = item.get("alternatives")
+        if (
+            not isinstance(options, list)
+            or len(options) != 2
+            or not all(
+                isinstance(option, str) and 3 <= len(option.strip()) <= 160 and "\n" not in option
+                for option in options
+            )
+        ):
+            rejected.append("alternatives")
+            continue
+        if options[0].strip().casefold() == options[1].strip().casefold():
+            rejected.append("identical_alternatives")
+            continue
+        if not all(
+            isinstance(item.get(key), str)
+            and 3 <= len(item[key].strip()) <= 180
+            and "\n" not in item[key]
+            for key in ("detail", "behavior_effect")
+        ):
+            rejected.append("detail_or_effect")
+            continue
+        key = (item["dimension"], item["detail"].strip().casefold())
+        if key in seen:
+            rejected.append("duplicate")
+            continue
+        seen.add(key)
+        accepted.append(
+            {
+                key: item[key]
+                for key in (
+                    "dimension",
+                    "status",
+                    "source_span",
+                    "detail",
+                    "alternatives",
+                    "behavior_effect",
+                )
+            }
+        )
+    # A supported text conflict takes priority over an incidental boundary question.
+    order = {"conflict": 0, "operation": 1, "result": 2, "input": 3, "boundary": 4}
+    accepted.sort(key=lambda item: order[item["dimension"]])
+    if len(accepted) > 2:
+        rejected.extend(["capacity"] * (len(accepted) - 2))
+    if len(items) > 8:
+        rejected.extend(["scan_capacity"] * (len(items) - 8))
+    return accepted[:2], rejected
+
+
+def _v1508_render_contract(data, entry, witness, source_sha, decisions, illustrative=False):
+    if not decisions:
+        return _render_contract(data, entry, witness, source_sha, illustrative)
+    clauses = [
+        dict(id="I0", kind="input", text=data["input_summary"].strip()),
+        dict(id="O0", kind="result", text=data["result_summary"].strip()),
+        dict(id="R0", kind="operation", text=data["operation_summary"].strip()),
+    ]
+    lines = [
+        f"Please clarify these behavior decisions for {entry}.",
+        "The alternatives are tentative, may both be wrong, and are not an exhaustive list.",
+    ]
+    for index, item in enumerate(decisions):
+        label = f"D{index}"
+        lines.extend(
+            [
+                f"{label} — {item['detail']}",
+                "Relevant description: " + json.dumps(item["source_span"], ensure_ascii=False),
+                "A: " + item["alternatives"][0] + "; B: " + item["alternatives"][1],
+                "Behavior affected: " + item["behavior_effect"],
+            ]
+        )
+        clauses.append(dict(id=label, kind="open_decision", text=item["detail"], **item))
+    lines.extend(
+        [
+            "For context, the current draft has this fallible interpretation:",
+            "I0 — Inputs: " + clauses[0]["text"],
+            "O0 — Result representation: " + clauses[1]["text"],
+            "R0 — Computation: " + clauses[2]["text"],
+        ]
+    )
+    if data.get("conflict_spans"):
+        lines.append(
+            "Potentially incompatible passages: "
+            + json.dumps(data["conflict_spans"], ensure_ascii=False)
+        )
+    lines.append(
+        "For each D item, state the intended rule rather than only an option letter; "
+        "if neither alternative fits, give the correct rule. Also correct any other part of the draft interpretation."
+    )
+    if illustrative:
+        lines.append(
+            "One small illustrative input and intended result may help specify the mapping; no hidden tests or reference program are requested."
+        )
+    question = "\n".join(lines)
+    return question, dict(
+        protocol="decision-contract-v1",
+        atomic=False,
+        claim_kind="contract",
+        clauses=clauses,
+        source_sha256=source_sha,
+        question_sha256=hashlib.sha256(question.encode()).hexdigest(),
+    )
+
+
 def _contract_witnesses(anchor, report, inputs, measured):
     """Only an anchor's completed, domain-confirmed calls can be printed as examples."""
     if not report:
@@ -2141,6 +2589,8 @@ def compile_reply(payload, answer, prompt, entry, records, binding):
             "O0": r"\b(?:O0|returns?|result|representation|format)\b",
             "R0": r"\b(?:R0|rule|computation|operation|mapping|algorithm)\b",
             "E0": r"\b(?:E0|example|sample|demonstration|shown|observed)\b",
+            "D0": r"\bD0\b",
+            "D1": r"\bD1\b",
         }
         scoped = bool(
             re.search(subjects.get(item["clause_id"], r"(?!)"), _v129_without_quoted(span), re.I)
@@ -2270,6 +2720,7 @@ def compile_reply(payload, answer, prompt, entry, records, binding):
         clause_responses=links,
         retained_reply_clauses=spans,
         semantic_notes=notes,
+        decision_questions=[c for c in clauses.values() if c.get("kind") == "open_decision"],
         unresolved_clause_ids=[
             cid
             for cid in clauses
@@ -2368,10 +2819,11 @@ class _V129Session:
         if not isinstance(data, dict):
             return False
         if role in {"behavior_question", "question_revision"}:
-            return all(
+            # Partial records reach the field-level question validator for repair.
+            return any(
                 isinstance(data.get(k), str)
                 for k in ("input_summary", "result_summary", "operation_summary")
-            )
+            ) or isinstance(data.get("decisions"), list)
         if role == "candidate_review":
             return (
                 type(data.get("candidate_index")) is int
@@ -2406,8 +2858,27 @@ class _V129Session:
                 self.events.append(dict(role=role, status="budget_abstention"))
                 return {}
             self.calls += 1
+        if role == "reply_map":
+            packet = _v15010_property_packet(packet)
+            table = packet["answer_property_sources"]
+            self.events.append(
+                dict(
+                    role="v15010_property_sources",
+                    status="measured",
+                    protocol=table["protocol"],
+                    emitted_clause_count=table["emitted_clause_count"],
+                    emitted_character_count=table["emitted_character_count"],
+                    omitted_clause_count=table["omitted_clause_count"],
+                    overflow=table["overflow"],
+                )
+            )
         packet = _campaign_packet(role, packet, self.policy)
-        packet = dict(packet, expected_schema=V129_PROMPTS.get("schemas", {}).get(role, {}))
+        target_schema = (
+            packet.get("expected_schema", {})
+            if role == "schema_recovery"
+            else V129_PROMPTS.get("schemas", {}).get(role, {})
+        )
+        packet = dict(packet, expected_schema=target_schema)
         messages = [
             dict(role="system", content=V129_PROMPTS["roles"][role]),
             dict(
@@ -2445,6 +2916,7 @@ class _V129Session:
                 fixed = self.request(
                     "schema_recovery",
                     dict(
+                        packet if role == "reply_map" else {},
                         previous_payload=text,
                         target_role=role,
                         output_kind="python_code_block"
@@ -3057,35 +3529,72 @@ class ClariBridge(ClarificationAlgorithmBase):
     def v150_question(self, session, anchor, report, inputs, records):
         measured = self.v150_observations(report, inputs)
         eligible = _contract_witnesses(anchor, report, inputs, measured)
+        prompt = session.packet["original_prompt"]
         packet = dict(
             session.packet,
             anchor_source=anchor,
             measured_observations=measured,
             anchor_observations=eligible,
+            allowed_witness_ids=[item["id"] for item in eligible],
             visible_examples=records,
         )
-        data = session.request("behavior_question", packet)
-        if not _contract_shape(data, eligible, session.packet["original_prompt"]):
-            data = session.request("question_revision", dict(packet, rejected_proposal=data))
-        valid = _contract_shape(data, eligible, session.packet["original_prompt"])
-        witness = next(
-            (item for item in eligible if valid and item["id"] == data.get("witness_id")), None
-        )
+        raw = session.request("behavior_question", packet)
+        data, rejected = _v1508_contract_fields(raw, eligible, prompt)
+        keys = ("input_summary", "result_summary", "operation_summary")
+        retained = sum(key in data for key in keys)
+        decisions, decision_rejected = _v1508_decisions(raw, prompt)
+        recovered = 0
+        if retained < 3:
+            revision = session.request(
+                "question_revision", dict(packet, rejected_proposal=raw, usable_fields=data)
+            )
+            fixed, fixed_rejected = _v1508_contract_fields(revision, eligible, prompt)
+            rejected.extend(fixed_rejected)
+            for key in keys:
+                if key not in data and key in fixed:
+                    data[key] = fixed[key]
+                    recovered += 1
+            if not data["witness_id"]:
+                data["witness_id"] = fixed["witness_id"]
+            if not data["conflict_spans"]:
+                data["conflict_spans"] = fixed["conflict_spans"]
+            if not decisions:
+                decisions, more_rejected = _v1508_decisions(revision, prompt)
+                decision_rejected.extend(more_rejected)
+        witness = next((item for item in eligible if item["id"] == data["witness_id"]), None)
         witness = witness or (eligible[0] if eligible else None)
-        if not valid:
-            data = _fallback_contract(anchor, session.packet["entry_point"], witness)
-        question, binding = _render_contract(
+        fallback = _fallback_contract(anchor, session.packet["entry_point"], witness)
+        missing = [key for key in keys if key not in data]
+        for key in missing:
+            data[key] = fallback[key]
+        question, binding = _v1508_render_contract(
             data,
             session.packet["entry_point"],
             witness,
             _v129_source_sha(anchor),
+            decisions,
             self.config.get("illustrative_example", False),
         )
         session.events.append(
             dict(
                 role="contract_render",
-                status="complete" if valid else "summary_unavailable",
-                measured_example=bool(witness),
+                status="complete" if not missing else "partial_summary_fallback",
+                measured_example=bool(witness) and not decisions,
+                summary_fields_retained=retained,
+                summary_fields_recovered=recovered,
+                summary_fields_fallback=len(missing),
+                auxiliary_rejections=rejected,
+                decision_count=len(decisions),
+                decision_rejections=decision_rejected,
+                decision_list_observed=isinstance(raw, dict)
+                and isinstance(raw.get("decisions"), list),
+                decision_proposed_count=len(raw["decisions"])
+                if isinstance(raw, dict) and isinstance(raw.get("decisions"), list)
+                else None,
+                eligible_witness_count=len(eligible),
+                witness_status="selected" if witness else "no_eligible_witness",
+                question_sha256=binding["question_sha256"],
+                protocol=binding["protocol"],
             )
         )
         return question, binding
@@ -3362,6 +3871,13 @@ class ClariBridge(ClarificationAlgorithmBase):
                 entry,
                 records,
                 session.binding,
+            )
+            session.events.append(
+                dict(
+                    role="v15010_property_compile",
+                    status="measured",
+                    **compiled["property_protocol"],
+                )
             )
             records, properties = compiled["records"], compiled["properties"]
             session.packet.update(
